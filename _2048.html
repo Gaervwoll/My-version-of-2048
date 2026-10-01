@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="2048 Осень">
+<meta name="theme-color" content="#3a2410">
+<title>2048 — осень</title>
+<style>
+  :root {
+    --bg:            #3a2410;
+    --board-bg:      #5c3a1a;
+    --cell-empty:    #e8d9c0;
+    --text-light:    #f5e6c8;
+    --accent:        #c05229;
+    --accent-dark:   #9c2a3b;
+    --gold:          #edc22e;
+    --header-label:  #d9b98a;
+    --pad: 10px;
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text-light);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+
+  /* ===== Каркас ===== */
+  #app {
+    position: fixed;
+    inset: 0;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* ===== Header ===== */
+  header {
+    width: 100%;
+    max-width: 100%;
+    padding: 8px 14px 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+  .logo { display: flex; flex-direction: column; line-height: 1; }
+  .logo-title {
+    font-size: clamp(24px, 7vw, 34px);
+    font-weight: 800;
+    color: var(--text-light);
+    letter-spacing: -0.5px;
+  }
+  .logo-sub {
+    font-size: clamp(10px, 2.6vw, 12px);
+    color: var(--accent);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .score-plate {
+    display: flex;
+    background: var(--board-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    padding: 6px 4px;
+    max-width: 60vw;
+  }
+  .score-half {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    min-width: 0;
+  }
+  .score-half + .score-half { border-left: 1px solid var(--accent); }
+  .score-label {
+    font-size: clamp(8px, 2.2vw, 10px);
+    letter-spacing: 0.5px;
+    color: var(--header-label);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .score-value {
+    font-size: clamp(14px, 4vw, 20px);
+    font-weight: 800;
+    color: #fff;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .score-value.high { color: var(--gold); }
+
+  /* ===== Панель с кнопкой Хеш (сверху) ===== */
+  .toolbar {
+    width: 100%;
+    max-width: 100%;
+    padding: 0 14px 6px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+  .toolbar button {
+    padding: 6px 12px;
+    font-size: clamp(11px, 3vw, 13px);
+    font-weight: 700;
+    color: var(--text-light);
+    background: var(--board-bg);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    cursor: pointer;
+    letter-spacing: 0.4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .toolbar button:active { background: var(--accent-dark); }
+  .toolbar button:disabled { opacity: 0.4; pointer-events: none; }
+
+  /* ===== Игровое поле ===== */
+  #board {
+    position: relative;
+    background: var(--board-bg);
+    border-radius: 12px;
+    padding: var(--pad);
+    margin: 4px 0;
+    flex: 0 0 auto;
+    touch-action: none;
+  }
+  #board-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  .cell {
+    position: absolute;
+    background: var(--cell-empty);
+    border-radius: 8px;
+  }
+  .tile {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-weight: 800;
+    will-change: transform;
+    z-index: 2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== Оверлей победы/проигрыша ===== */
+  #overlay {
+    position: absolute;
+    inset: var(--pad, 10px);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.55);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    text-align: center;
+    padding: 16px;
+    gap: 12px;
+  }
+  #overlay.show { display: flex; }
+  #overlay .overlay-title {
+    font-size: clamp(20px, 6vw, 28px);
+    font-weight: 800;
+    color: #fff;
+  }
+  #overlay .overlay-sub {
+    font-size: clamp(11px, 3vw, 14px);
+    color: var(--header-label);
+  }
+  #overlay button {
+    margin-top: 6px;
+    padding: 10px 20px;
+    font-size: clamp(12px, 3.2vw, 14px);
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: background 0.15s;
+  }
+  #overlay button:active { background: var(--accent-dark); }
+
+  /* ===== Кнопки под полем ===== */
+  .controls {
+    display: flex;
+    gap: 10px;
+    padding: 6px 14px calc(8px + env(safe-area-inset-bottom));
+    flex: 0 0 auto;
+    justify-content: center;
+  }
+  .controls button {
+    flex: 1 1 auto;
+    min-width: 110px;
+    max-width: 180px;
+    padding: 10px 14px;
+    font-size: clamp(12px, 3.2vw, 14px);
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    letter-spacing: 0.4px;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .controls button:active { background: var(--accent-dark); }
+  .controls button:disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  /* ===== Модалка шаринга ===== */
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+    padding: calc(16px + env(safe-area-inset-top))
+             calc(16px + env(safe-area-inset-right))
+             calc(16px + env(safe-area-inset-bottom))
+             calc(16px + env(safe-area-inset-left));
+  }
+  .modal.show { display: flex; }
+  .modal-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--board-bg);
+    border-radius: 16px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+  .modal-title {
+    font-size: clamp(16px, 4.5vw, 20px);
+    font-weight: 800;
+    color: #fff;
+    text-align: center;
+  }
+  .modal-sub {
+    font-size: clamp(11px, 3vw, 13px);
+    color: var(--header-label);
+    text-align: center;
+    line-height: 1.4;
+  }
+  #hash-io {
+    width: 100%;
+    min-height: 90px;
+    max-height: 160px;
+    resize: vertical;
+    background: #2e1a0f;
+    color: var(--text-light);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 10px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: clamp(11px, 3vw, 13px);
+    line-height: 1.4;
+    word-break: break-all;
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+  #hash-io:focus { outline: 2px solid var(--gold); }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .modal-actions button {
+    flex: 1 1 auto;
+    min-width: 100px;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: clamp(11px, 3vw, 13px);
+    cursor: pointer;
+    letter-spacing: 0.4px;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:active { background: var(--accent-dark); }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-light);
+    border: 1px solid var(--accent);
+  }
+  .btn-secondary:active { background: rgba(192,82,41,0.2); }
+  .modal-status {
+    min-height: 1em;
+    font-size: clamp(10px, 2.8vw, 12px);
+    text-align: center;
+    color: var(--gold);
+  }
+  .modal-status.error { color: #ff8080; }
+</style>
+</head>
+<body>
+
+<!-- ==================== ОСНОВНОЙ КАРКАС ==================== -->
+<div id="app">
+
+  <!-- ВЕРХ: логотип + счёт/рекорд -->
+  <header>
+    <div class="logo">
+      <div class="logo-title">2048</div>
+      <div class="logo-sub">осеннее издание</div>
+    </div>
+    <div class="score-plate">
+      <div class="score-half">
+        <div class="score-label">Счёт</div>
+        <div class="score-value" id="score">0</div>
+      </div>
+      <div class="score-half">
+        <div class="score-label">Рекорд</div>
+        <div class="score-value high" id="highscore">0</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ПАНЕЛЬ СВЕРХУ: сразу кнопка Хеш -->
+  <div class="toolbar" id="toolbar">
+    <button id="share-btn" type="button">🔗 Хеш</button>
+  </div>
+
+  <!-- ИГРОВОЕ ПОЛЕ -->
+  <div id="board">
+    <div id="board-inner"></div>
+    <div id="overlay">
+      <div class="overlay-title" id="overlay-title"></div>
+      <div class="overlay-sub" id="overlay-sub"></div>
+      <button id="overlay-btn"></button>
+    </div>
+  </div>
+
+  <!-- КНОПКИ ПОД ПОЛЕМ -->
+  <div class="controls" id="controls">
+    <button id="undo-btn" type="button" disabled>↶ Отмена</button>
+    <button id="new-btn" type="button">⟳ Новая игра</button>
+  </div>
+
+</div>
+<!-- ==================== /ОСНОВНОЙ КАРКАС ==================== -->
+
+<!-- ==================== МОДАЛКА ШАРИНГА ==================== -->
+<div id="share-modal" class="modal">
+  <div class="modal-card">
+    <div class="modal-title">Хеш-ключ партии</div>
+    <div class="modal-sub">
+      Скопируйте ключ, чтобы поделиться партией,<br>
+      или вставьте чужой ключ и нажмите «Загрузить».
+    </div>
+    <textarea id="hash-io" spellcheck="false" autocomplete="off"
+              autocapitalize="off" autocorrect="off"></textarea>
+    <div class="modal-actions">
+      <button id="hash-copy" class="btn-primary" type="button">Скопировать</button>
+      <button id="hash-load" class="btn-primary" type="button">Загрузить</button>
+      <button id="hash-close" class="btn-secondary" type="button">Закрыть</button>
+    </div>
+    <div id="hash-status" class="modal-status"></div>
+  </div>
+</div>
+<!-- ==================== /МОДАЛКА ШАРИНГА ==================== -->
+
+<script>
+(() => {
+  "use strict";
+
+  // ============ КОНСТАНТЫ ============
+  const SIZE = 4;
+  const WIN_THRESHOLDS = [2048, 4096, 8192, 16384, 32768, 65536, 131072];
+  const ANIM_MS = 110;
+  const SPAWN_MS = 130;
+  const MERGE_MS = 140;
+  const SWIPE_MIN = 22;
+  const SCORE_KEY = "game2048_autumn_highscore";
+  const STATE_KEY = "game2048_autumn_state";
+  const SEED_KEY  = "game2048_autumn_last_seed";
+  const MAX_UNDO = 5000;
+  const AUTOSAVE = true;
+
+  // ============ ПАЛИТРА ============
+  const TILE_COLORS = {
+    0:    ["#e8d9c0", "#8a7560"],
+    2:    ["#f7dd72", "#ffffff"],
+    4:    ["#f2d69b", "#ffffff"],
+    8:    ["#e8b96a", "#ffffff"],
+    16:   ["#e0a04a", "#ffffff"],
+    32:   ["#d98536", "#ffffff"],
+    64:   ["#cc6b2c", "#ffffff"],
+    128:  ["#c05229", "#ffffff"],
+    256:  ["#b03a2e", "#ffffff"],
+    512:  ["#9c2a3b", "#ffffff"],
+    1024: ["#7d1f4a", "#ffffff"],
+    2048: ["#5c1a4d", "#ffffff"],
+    4096: ["#4a2b6b", "#ffffff"],
+    8192: ["#3a2e7a", "#ffffff"],
+    16384:["#2c3e78", "#ffffff"],
+    32768:["#1f3054", "#ffffff"],
+    65536:["#4a2b1a", "#ffd9a8"],
+    131072:["#2e1a0f", "#ffb870"],
+  };
+  const HIGH_PALETTE = [
+    ["#4a2b1a", "#ffd9a8"],
+    ["#2e1a0f", "#ffb870"],
+    ["#5c3a1a", "#ffe4b5"],
+    ["#3a2410", "#ffcc88"],
+    ["#6b4423", "#fff0d4"],
+  ];
+  function tileStyle(v) {
+    if (TILE_COLORS[v]) return TILE_COLORS[v];
+    const idx = (Math.log2(v) - 18) % HIGH_PALETTE.length;
+    return HIGH_PALETTE[(idx + HIGH_PALETTE.length) % HIGH_PALETTE.length];
+  }
+  function fontSizeFor(v, cellSize) {
+    const digits = String(v).length;
+    let ratio;
+    if (digits <= 1) ratio = 0.46;
+    else if (digits === 2) ratio = 0.42;
+    else if (digits === 3) ratio = 0.36;
+    else if (digits === 4) ratio = 0.30;
+    else if (digits === 5) ratio = 0.24;
+    else ratio = 0.20;
+    return Math.round(cellSize * ratio);
+  }
+
+  // ============ RNG ============
+  function createRng(seed) {
+    return {
+      state: seed >>> 0,
+      next() {
+        this.state = (this.state + 0x6D2B79F5) >>> 0;
+        let t = this.state;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      },
+      snapshot() { return this.state >>> 0; },
+      restore(s) { this.state = s >>> 0; }
+    };
+  }
+  function randomSeed() {
+    return (Math.floor(Math.random() * 4294967296)) >>> 0;
+  }
+
+  // ============ DOM ============
+  const boardEl      = document.getElementById("board");
+  const boardInner   = document.getElementById("board-inner");
+  const scoreEl      = document.getElementById("score");
+  const highEl       = document.getElementById("highscore");
+  const undoBtn      = document.getElementById("undo-btn");
+  const newBtn       = document.getElementById("new-btn");
+  const overlay      = document.getElementById("overlay");
+  const overlayTitle = document.getElementById("overlay-title");
+  const overlaySub   = document.getElementById("overlay-sub");
+  const overlayBtn   = document.getElementById("overlay-btn");
+
+  const shareBtn     = document.getElementById("share-btn");
+
+  const shareModal   = document.getElementById("share-modal");
+  const hashIO       = document.getElementById("hash-io");
+  const hashCopy     = document.getElementById("hash-copy");
+  const hashLoad     = document.getElementById("hash-load");
+  const hashClose    = document.getElementById("hash-close");
+  const hashStatus   = document.getElementById("hash-status");
+
+  // ============ СОСТОЯНИЕ ============
+  let board = [];
+  let score = 0;
+  let highscore = loadHighscore();
+  let achieved = new Set();
+  let gameOver = false;
+  let animating = false;
+  let undoStack = [];
+  let currentSeed = 0;
+  let rng = createRng(1);
+
+  let pad = 10;
+  let cellSize = 70;
+  let gap = 10;
+
+  const tileEls = new Map();
+  let nextTileId = 0;
+
+  // ============ ГЕОМЕТРИЯ ============
+  function computeLayout() {
+    const vv = window.visualViewport;
+    const vw = (vv ? vv.width  : window.innerWidth);
+    const vh = (vv ? vv.height : window.innerHeight);
+
+    const headerEl   = document.querySelector("header");
+    const toolbarEl  = document.getElementById("toolbar");
+    const controlsEl = document.getElementById("controls");
+
+    const headerH   = headerEl   ? headerEl.getBoundingClientRect().height   : 0;
+    const toolbarH  = toolbarEl  ? toolbarEl.getBoundingClientRect().height  : 0;
+    const controlsH = controlsEl ? controlsEl.getBoundingClientRect().height : 0;
+
+    const margin = 8;
+    const availW = vw - 2 * margin;
+    const availH = vh - headerH - toolbarH - controlsH - 2 * margin;
+
+    const boardSide = Math.max(200, Math.min(availW, availH));
+
+    gap = Math.max(6, Math.round(boardSide * 0.028));
+    pad = Math.max(8, Math.round(boardSide * 0.032));
+    const inner = boardSide - 2 * pad;
+    cellSize = (inner - 3 * gap) / 4;
+
+    document.documentElement.style.setProperty("--pad", pad + "px");
+    boardEl.style.width  = boardSide + "px";
+    boardEl.style.height = boardSide + "px";
+    boardInner.style.width  = inner + "px";
+    boardInner.style.height = inner + "px";
+
+    renderEmptyCells();
+    for (const t of tileEls.values()) {
+      placeTileEl(t, t.r, t.c, false);
+      updateFontSize(t);
+    }
+  }
+
+  function cellXY(r, c) {
+    return {
+      x: c * (cellSize + gap),
+      y: r * (cellSize + gap),
+      size: cellSize
+    };
+  }
+
+  function renderEmptyCells() {
+    boardInner.querySelectorAll(".cell").forEach(el => el.remove());
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const { x, y, size } = cellXY(r, c);
+        const div = document.createElement("div");
+        div.className = "cell";
+        div.style.left = x + "px";
+        div.style.top = y + "px";
+        div.style.width = size + "px";
+        div.style.height = size + "px";
+        boardInner.appendChild(div);
+      }
+    }
+  }
+
+  // ============ ПЛИТКИ ============
+  function createTileEl(r, c, value, animateSpawn = true) {
+    const { x, y, size } = cellXY(r, c);
+    const [bg, fg] = tileStyle(value);
+
+    const el = document.createElement("div");
+    el.className = "tile";
+    el.style.width = size + "px";
+    el.style.height = size + "px";
+    el.style.left = "0px";
+    el.style.top = "0px";
+    el.style.transform = `translate(${x}px, ${y}px)`;
+    el.style.background = bg;
+    el.style.color = fg;
+    el.textContent = String(value);
+    boardInner.appendChild(el);
+
+    const tile = { el, r, c, value };
+    updateFontSize(tile);
+
+    if (animateSpawn) {
+      el.style.transition = `transform ${SPAWN_MS}ms ease-out, ` +
+                            `width ${SPAWN_MS}ms ease-out, ` +
+                            `height ${SPAWN_MS}ms ease-out`;
+      el.animate(
+        [{ transform: `translate(${x}px, ${y}px) scale(0)` },
+         { transform: `translate(${x}px, ${y}px) scale(1)` }],
+        { duration: SPAWN_MS, easing: "ease-out" }
+      );
+    }
+    return tile;
+  }
+
+  function placeTileEl(tile, r, c, animated = true) {
+    const { x, y } = cellXY(r, c);
+    tile.r = r; tile.c = c;
+    if (animated) {
+      tile.el.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.22,.61,.36,1)`;
+    } else {
+      tile.el.style.transition = "none";
+    }
+    tile.el.style.transform = `translate(${x}px, ${y}px)`;
+  }
+
+  function updateFontSize(tile) {
+    const fs = fontSizeFor(tile.value, cellSize);
+    tile.el.style.fontSize = fs + "px";
+    const [bg, fg] = tileStyle(tile.value);
+    tile.el.style.background = bg;
+    tile.el.style.color = fg;
+    tile.el.textContent = String(tile.value);
+  }
+
+  function setTileValue(tile, value) {
+    tile.value = value;
+    updateFontSize(tile);
+  }
+
+  function getTileId(tile) {
+    for (const [id, t] of tileEls.entries()) {
+      if (t === tile) return id;
+    }
+    return null;
+  }
+
+  // ============ ЛОГИКА ИГРЫ ============
+  function emptyCells(b) {
+    const out = [];
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++)
+        if (b[r][c] === 0) out.push([r, c]);
+    return out;
+  }
+
+  function spawnRandom(b) {
+    const cells = emptyCells(b);
+    if (!cells.length) return null;
+    const idx = Math.floor(rng.next() * cells.length);
+    const [r, c] = cells[idx];
+    b[r][c] = rng.next() < 0.9 ? 2 : 4;
+    return [r, c];
+  }
+
+  function compress(row) {
+    const nz = row.filter(v => v !== 0);
+    while (nz.length < SIZE) nz.push(0);
+    return nz;
+  }
+
+  function mergeRow(row) {
+    let gained = 0;
+    for (let i = 0; i < SIZE - 1; i++) {
+      if (row[i] !== 0 && row[i] === row[i + 1]) {
+        row[i] *= 2;
+        row[i + 1] = 0;
+        gained += row[i];
+      }
+    }
+    return [row, gained];
+  }
+
+  function reverse(b) { return b.map(r => [...r].reverse()); }
+  function transpose(b) {
+    const out = [];
+    for (let c = 0; c < SIZE; c++) {
+      const col = [];
+      for (let r = 0; r < SIZE; r++) col.push(b[r][c]);
+      out.push(col);
+    }
+    return out;
+  }
+
+  function slideLeft(b) {
+    const nb = [];
+    let gained = 0, moved = false;
+    for (const row of b) {
+      let nr = compress(row);
+      let g;
+      [nr, g] = mergeRow(nr);
+      gained += g;
+      nr = compress(nr);
+      if (nr.some((v, i) => v !== row[i])) moved = true;
+      nb.push(nr);
+    }
+    return [nb, gained, moved];
+  }
+
+  function computeMove(b, dir) {
+    let bb = b.map(r => [...r]);
+    if (dir === "left")  return slideLeft(bb);
+    if (dir === "right") {
+      bb = reverse(bb);
+      let [nb, g, m] = slideLeft(bb);
+      return [reverse(nb), g, m];
+    }
+    if (dir === "up") {
+      bb = transpose(bb);
+      let [nb, g, m] = slideLeft(bb);
+      return [transpose(nb), g, m];
+    }
+    if (dir === "down") {
+      bb = transpose(bb);
+      bb = reverse(bb);
+      let [nb, g, m] = slideLeft(bb);
+      nb = reverse(nb);
+      return [transpose(nb), g, m];
+    }
+    return [bb, 0, false];
+  }
+
+  function canMove(b) {
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++) {
+        if (b[r][c] === 0) return true;
+        const v = b[r][c];
+        if (c + 1 < SIZE && b[r][c + 1] === v) return true;
+        if (r + 1 < SIZE && b[r + 1][c] === v) return true;
+      }
+    return false;
+  }
+
+  // ============ ПЛАН АНИМАЦИИ ============
+  function planAnimation(oldBoard, newBoard, dir) {
+    const tileAt = new Map();
+    for (const t of tileEls.values()) tileAt.set(t.r + "," + t.c, t);
+
+    const plan = [];
+
+    function pairLine(srcCells, dstCells) {
+      let si = 0;
+      for (const [dr, dc] of dstCells) {
+        if (si >= srcCells.length) break;
+        const targetVal = newBoard[dr][dc];
+        let acc = 0;
+        const group = [];
+        while (si < srcCells.length && acc < targetVal) {
+          const [sr, sc] = srcCells[si];
+          const v = oldBoard[sr][sc];
+          acc += v;
+          group.push({ sr, sc, v, tile: tileAt.get(sr + "," + sc) });
+          si++;
+          if (acc === targetVal) break;
+        }
+        if (group.length === 1) {
+          const { tile, sr, sc, v } = group[0];
+          if (tile) plan.push({ type: "move", tile, to: [dr, dc], value: v, from: [sr, sc] });
+        } else if (group.length >= 2) {
+          const first = group[0];
+          if (first.tile) {
+            plan.push({ type: "merge", tile: first.tile, to: [dr, dc],
+                        newValue: targetVal, from: [first.sr, first.sc] });
+          }
+          for (let i = 1; i < group.length; i++) {
+            const g = group[i];
+            if (g.tile) {
+              plan.push({ type: "merge_extra", tile: g.tile, to: [dr, dc],
+                          from: [g.sr, g.sc] });
+            }
+          }
+        }
+      }
+    }
+
+    if (dir === "left" || dir === "right") {
+      for (let r = 0; r < SIZE; r++) {
+        let srcCells = [], dstCells = [];
+        for (let c = 0; c < SIZE; c++) {
+          if (oldBoard[r][c] !== 0) srcCells.push([r, c]);
+          if (newBoard[r][c] !== 0) dstCells.push([r, c]);
+        }
+        if (dir === "right") { srcCells.reverse(); dstCells.reverse(); }
+        pairLine(srcCells, dstCells);
+      }
+    } else {
+      for (let c = 0; c < SIZE; c++) {
+        let srcCells = [], dstCells = [];
+        for (let r = 0; r < SIZE; r++) {
+          if (oldBoard[r][c] !== 0) srcCells.push([r, c]);
+          if (newBoard[r][c] !== 0) dstCells.push([r, c]);
+        }
+        if (dir === "down") { srcCells.reverse(); dstCells.reverse(); }
+        pairLine(srcCells, dstCells);
+      }
+    }
+    return plan;
+  }
+
+  // ============ ХОД ============
+  function handleMove(dir) {
+    if (animating || gameOver) return;
+    if (overlay.classList.contains("show")) return;
+
+    const oldBoard = board.map(r => [...r]);
+    const oldScore = score;
+    const oldAchieved = new Set(achieved);
+
+    const [newBoard, gained, moved] = computeMove(board, dir);
+    if (!moved) return;
+
+    undoStack.push({ board: oldBoard, score: oldScore, achieved: oldAchieved });
+    if (undoStack.length > MAX_UNDO) undoStack.shift();
+    undoBtn.disabled = false;
+
+    const plan = planAnimation(oldBoard, newBoard, dir);
+
+    board = newBoard;
+    score += gained;
+    if (score > highscore) {
+      highscore = score;
+      saveHighscore(highscore);
+    }
+    scoreEl.textContent = score;
+    highEl.textContent = highscore;
+
+    animating = true;
+    animatePlan(plan, () => finalizeMove());
+  }
+
+  function animatePlan(plan, onDone) {
+    if (!plan.length) { onDone(); return; }
+
+    for (const op of plan) placeTileEl(op.tile, op.to[0], op.to[1], true);
+
+    setTimeout(() => {
+      for (const op of plan) {
+        if (op.type === "merge_extra") {
+          op.tile.el.remove();
+          tileEls.delete(getTileId(op.tile));
+        }
+      }
+      for (const op of plan) {
+        if (op.type === "merge") {
+          setTileValue(op.tile, op.newValue);
+          op.tile.el.animate(
+            [{ transform: transformFor(op.tile.r, op.tile.c, 1) },
+             { transform: transformFor(op.tile.r, op.tile.c, 1.12) },
+             { transform: transformFor(op.tile.r, op.tile.c, 1) }],
+            { duration: MERGE_MS, easing: "ease-out" }
+          );
+        }
+      }
+      setTimeout(onDone, MERGE_MS);
+    }, ANIM_MS);
+  }
+
+  function transformFor(r, c, scale = 1) {
+    const { x, y } = cellXY(r, c);
+    return `translate(${x}px, ${y}px) scale(${scale})`;
+  }
+
+  function finalizeMove() {
+    for (const [id, t] of [...tileEls.entries()]) {
+      if (board[t.r][t.c] === 0) {
+        t.el.remove();
+        tileEls.delete(id);
+      }
+    }
+
+    const pos = spawnRandom(board);
+    if (pos) {
+      const [r, c] = pos;
+      const id = nextTileId++;
+      const tile = createTileEl(r, c, board[r][c], true);
+      tileEls.set(id, tile);
+    }
+
+    checkWinThresholds();
+
+    if (!canMove(board)) {
+      gameOver = true;
+      showOverlay("ИГРА ОКОНЧЕНА", "Нажмите «Новая игра»", "⟳ Начать заново", () => {
+        hideOverlay();
+        restart();
+      });
+    }
+
+    animating = false;
+    saveState();
+  }
+
+  // ============ ПОБЕДЫ ============
+  function maxValue() {
+    let m = 0;
+    for (const row of board) for (const v of row) if (v > m) m = v;
+    return m;
+  }
+
+  function checkWinThresholds() {
+    const m = maxValue();
+    for (const th of WIN_THRESHOLDS) {
+      if (m >= th && !achieved.has(th)) {
+        achieved.add(th);
+        showOverlay(
+          `УРОВЕНЬ ${th} ДОСТИГНУТ!`,
+          "Продолжайте играть — впереди новые рубежи.",
+          "ПРИНЯТЬ И ПРОДОЛЖИТЬ",
+          () => hideOverlay()
+        );
+        return;
+      }
+    }
+  }
+
+  // ============ ОВЕРЛЕЙ ============
+  function showOverlay(title, sub, btnText, onClick) {
+    overlayTitle.textContent = title;
+    overlaySub.textContent = sub;
+    overlayBtn.textContent = btnText;
+    overlay.classList.add("show");
+    overlayBtn.onclick = onClick;
+  }
+
+  function hideOverlay() {
+    overlay.classList.remove("show");
+    overlayBtn.onclick = null;
+  }
+
+  // ============ СТАРТ / UNDO ============
+  function startGameWithSeed(seed) {
+    currentSeed = seed >>> 0;
+    rng = createRng(currentSeed);
+
+    for (const t of tileEls.values()) t.el.remove();
+    tileEls.clear();
+    nextTileId = 0;
+
+    board = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+    score = 0;
+    gameOver = false;
+    achieved.clear();
+    undoStack = [];
+    undoBtn.disabled = true;
+    scoreEl.textContent = "0";
+    highEl.textContent = highscore;
+    hideOverlay();
+
+    spawnRandom(board);
+    spawnRandom(board);
+    redrawTiles();
+
+    try { localStorage.setItem(SEED_KEY, String(currentSeed)); } catch {}
+    saveState();
+  }
+
+  function restart() {
+    if (animating) return;
+    clearState();
+    startGameWithSeed(randomSeed());
+  }
+
+  function redrawTiles() {
+    for (const t of tileEls.values()) t.el.remove();
+    tileEls.clear();
+    nextTileId = 0;
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const v = board[r][c];
+        if (v) {
+          const id = nextTileId++;
+          const tile = createTileEl(r, c, v, false);
+          tileEls.set(id, tile);
+        }
+      }
+    }
+  }
+
+  function undo() {
+    if (animating || !undoStack.length) return;
+    hideOverlay();
+    gameOver = false;
+
+    const snapshot = undoStack.pop();
+    board = snapshot.board.map(r => [...r]);
+    score = snapshot.score;
+    achieved = new Set(snapshot.achieved);
+
+    scoreEl.textContent = score;
+    undoBtn.disabled = undoStack.length === 0;
+    redrawTiles();
+    saveState();
+  }
+
+  // ============ РЕКОРД ============
+  function loadHighscore() {
+    try {
+      const v = localStorage.getItem(SCORE_KEY);
+      return v ? parseInt(v, 10) || 0 : 0;
+    } catch { return 0; }
+  }
+  function saveHighscore(v) {
+    try { localStorage.setItem(SCORE_KEY, String(v)); } catch {}
+  }
+
+  // ============ СОХРАНЕНИЕ ПАРТИИ ============
+  function serializeState() {
+    return {
+      version: 1,
+      seed: currentSeed,
+      rngState: rng.snapshot(),
+      board: board,
+      score: score,
+      highscore: highscore,
+      achieved: Array.from(achieved),
+      gameOver: gameOver
+    };
+  }
+
+  function deserializeState(obj) {
+    if (!obj || typeof obj !== "object" || obj.version !== 1) return null;
+    try {
+      if (!Array.isArray(obj.board) || obj.board.length !== SIZE) return null;
+      for (const row of obj.board) {
+        if (!Array.isArray(row) || row.length !== SIZE) return null;
+        for (const v of row) {
+          if (typeof v !== "number" || v < 0) return null;
+        }
+      }
+      return {
+        seed: (obj.seed >>> 0) || 0,
+        rngState: (obj.rngState >>> 0) || 0,
+        board: obj.board.map(r => r.slice()),
+        score: Number(obj.score) || 0,
+        highscore: Number(obj.highscore) || 0,
+        achieved: new Set(Array.isArray(obj.achieved) ? obj.achieved : []),
+        gameOver: !!obj.gameOver
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function saveState() {
+    if (!AUTOSAVE) return;
+    try {
+      localStorage.setItem(STATE_KEY, JSON.stringify(serializeState()));
+    } catch (e) {
+      console.warn("Не удалось сохранить партию:", e);
+    }
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STATE_KEY);
+      if (!raw) return null;
+      return deserializeState(JSON.parse(raw));
+    } catch (e) {
+      console.warn("Не удалось прочитать партию:", e);
+      return null;
+    }
+  }
+
+  function clearState() {
+    try { localStorage.removeItem(STATE_KEY); } catch {}
+  }
+
+  function applyLoadedState(st) {
+    currentSeed = st.seed;
+    rng = createRng(1);
+    rng.restore(st.rngState);
+
+    board = st.board.map(r => r.slice());
+    score = st.score;
+    highscore = Math.max(st.highscore, highscore);
+    saveHighscore(highscore);
+    achieved = new Set(st.achieved);
+    gameOver = st.gameOver;
+
+    undoStack = [];
+    undoBtn.disabled = true;
+
+    for (const t of tileEls.values()) t.el.remove();
+    tileEls.clear();
+    nextTileId = 0;
+    redrawTiles();
+
+    scoreEl.textContent = score;
+    highEl.textContent = highscore;
+    hideOverlay();
+
+    if (gameOver) {
+      showOverlay("ИГРА ОКОНЧЕНА", "Нажмите «Новая игра»",
+                  "⟳ Начать заново", () => { hideOverlay(); restart(); });
+    }
+  }
+
+  // ============ ХЕШ-КЛЮЧ ============
+  const HASH_PREFIX = "A2048:";
+  const HASH_VERSION = 1;
+
+  function valToExp(v) {
+    if (v === 0) return 0;
+    return Math.round(Math.log2(v));
+  }
+  function expToVal(e) {
+    if (e === 0) return 0;
+    return 2 ** e;
+  }
+
+  function bitsToBytes(bits) {
+    const bytes = new Uint8Array(bits.length / 8);
+    for (let i = 0; i < bits.length; i++) {
+      if (bits[i]) bytes[i >> 3] |= (1 << (7 - (i & 7)));
+    }
+    return bytes;
+  }
+  function bytesToBits(bytes, bitLen) {
+    const bits = new Uint8Array(bitLen);
+    for (let i = 0; i < bitLen; i++) {
+      bits[i] = (bytes[i >> 3] >> (7 - (i & 7))) & 1;
+    }
+    return bits;
+  }
+  function writeUint(bits, value, bitLen) {
+    for (let i = bitLen - 1; i >= 0; i--) bits.push((value >>> i) & 1);
+  }
+  function readUint(bits, offset, bitLen) {
+    let v = 0;
+    for (let i = 0; i < bitLen; i++) v = (v << 1) | bits[offset + i];
+    return v >>> 0;
+  }
+
+  function encodeHash() {
+    const bits = [];
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++)
+        writeUint(bits, valToExp(board[r][c]), 5);
+
+    writeUint(bits, currentSeed >>> 0, 32);
+    writeUint(bits, rng.snapshot() >>> 0, 32);
+    writeUint(bits, Math.min(score, 0xFFFFFF) >>> 0, 24);
+    writeUint(bits, Math.min(highscore, 0xFFFFFF) >>> 0, 24);
+    for (const th of WIN_THRESHOLDS) bits.push(achieved.has(th) ? 1 : 0);
+    bits.push(gameOver ? 1 : 0);
+
+    while (bits.length % 8 !== 0) bits.push(0);
+
+    const bytes = bitsToBytes(bits);
+    const payload = String.fromCharCode(HASH_VERSION) +
+                    String.fromCharCode(...bytes);
+    const b64 = btoa(payload)
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    return HASH_PREFIX + b64;
+  }
+
+  function decodeHash(str) {
+    if (typeof str !== "string") return null;
+    str = str.trim();
+    if (!str.startsWith(HASH_PREFIX)) return null;
+    const b64 = str.slice(HASH_PREFIX.length)
+      .replace(/-/g, "+").replace(/_/g, "/");
+    const pad = (4 - (b64.length % 4)) % 4;
+    let raw;
+    try {
+      raw = atob(b64 + "=".repeat(pad));
+    } catch { return null; }
+
+    if (raw.length < 2) return null;
+    const version = raw.charCodeAt(0);
+    if (version !== HASH_VERSION) return null;
+
+    const bytes = new Uint8Array(raw.length - 1);
+    for (let i = 1; i < raw.length; i++) bytes[i - 1] = raw.charCodeAt(i);
+
+    const totalBits = 16 * 5 + 32 + 32 + 24 + 24 + 7 + 1;
+    if (bytes.length * 8 < totalBits) return null;
+
+    const bits = bytesToBits(bytes, bytes.length * 8);
+    let off = 0;
+
+    const newBoard = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const e = readUint(bits, off, 5); off += 5;
+        if (e > 17) return null;
+        newBoard[r][c] = expToVal(e);
+      }
+    }
+    const seed = readUint(bits, off, 32); off += 32;
+    const rngState = readUint(bits, off, 32); off += 32;
+    const sc = readUint(bits, off, 24); off += 24;
+    const hi = readUint(bits, off, 24); off += 24;
+
+    const newAchieved = new Set();
+    for (const th of WIN_THRESHOLDS) {
+      const bit = readUint(bits, off, 1); off += 1;
+      if (bit) newAchieved.add(th);
+    }
+    const go = readUint(bits, off, 1) === 1;
+
+    return {
+      seed, rngState, board: newBoard, score: sc,
+      highscore: hi, achieved: newAchieved, gameOver: go
+    };
+  }
+
+  function applyHashState(st) {
+    currentSeed = st.seed >>> 0;
+    rng = createRng(1);
+    rng.restore(st.rngState >>> 0);
+
+    board = st.board.map(r => r.slice());
+    score = st.score;
+    highscore = Math.max(st.highscore, highscore);
+    saveHighscore(highscore);
+    achieved = new Set(st.achieved);
+    gameOver = !!st.gameOver;
+
+    undoStack = [];
+    undoBtn.disabled = true;
+
+    for (const t of tileEls.values()) t.el.remove();
+    tileEls.clear();
+    nextTileId = 0;
+    redrawTiles();
+
+    scoreEl.textContent = score;
+    highEl.textContent = highscore;
+    hideOverlay();
+
+    if (gameOver) {
+      showOverlay("ИГРА ОКОНЧЕНА", "Нажмите «Новая игра»",
+                  "⟳ Начать заново", () => { hideOverlay(); restart(); });
+    }
+
+    saveState();
+  }
+
+  // ============ МОДАЛКА ШАРИНГА ============
+  function setStatus(msg, isError = false) {
+    hashStatus.textContent = msg;
+    hashStatus.classList.toggle("error", isError);
+  }
+
+  function openShareModal() {
+    if (animating) return;
+    try {
+      hashIO.value = encodeHash();
+    } catch (e) {
+      hashIO.value = "";
+      setStatus("Не удалось сформировать ключ", true);
+      return;
+    }
+    setStatus("Ключ сформирован. Можно копировать или вставить свой.");
+    shareModal.classList.add("show");
+  }
+
+  function closeShareModal() {
+    shareModal.classList.remove("show");
+    setStatus("");
+  }
+
+  async function copyHash() {
+    const txt = hashIO.value.trim();
+    if (!txt) { setStatus("Нечего копировать", true); return; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(txt);
+      } else {
+        hashIO.select();
+        document.execCommand("copy");
+        window.getSelection().removeAllRanges();
+      }
+      setStatus("Скопировано ✓");
+    } catch {
+      hashIO.select();
+      setStatus("Выделено, нажмите «Копировать» в меню", true);
+    }
+  }
+
+  function loadHash() {
+    const txt = hashIO.value.trim();
+    if (!txt) { setStatus("Вставьте ключ в поле", true); return; }
+    const st = decodeHash(txt);
+    if (!st) { setStatus("Неверный или повреждённый ключ", true); return; }
+    applyHashState(st);
+    setStatus("Партия загружена ✓");
+    setTimeout(closeShareModal, 500);
+  }
+
+  // ============ СВАЙПЫ ============
+  function attachSwipe(el, callback) {
+    let sx = 0, sy = 0, active = false;
+    el.addEventListener("touchstart", e => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      sx = t.clientX; sy = t.clientY; active = true;
+    }, { passive: true });
+
+    el.addEventListener("touchmove", e => {
+      e.preventDefault();
+    }, { passive: false });
+
+    el.addEventListener("touchend", e => {
+      if (!active) return;
+      active = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx;
+      const dy = t.clientY - sy;
+      const ax = Math.abs(dx), ay = Math.abs(dy);
+      if (Math.max(ax, ay) < SWIPE_MIN) return;
+      if (ax > ay) callback(dx > 0 ? "right" : "left");
+      else         callback(dy > 0 ? "down"  : "up");
+    }, { passive: true });
+
+    el.addEventListener("mousedown", e => {
+      sx = e.clientX; sy = e.clientY; active = true;
+    });
+    el.addEventListener("mouseup", e => {
+      if (!active) return;
+      active = false;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      const ax = Math.abs(dx), ay = Math.abs(dy);
+      if (Math.max(ax, ay) < SWIPE_MIN) return;
+      if (ax > ay) callback(dx > 0 ? "right" : "left");
+      else         callback(dy > 0 ? "down"  : "up");
+    });
+  }
+
+  // ============ КНОПКИ / СОБЫТИЯ ============
+  newBtn.addEventListener("click", restart);
+  undoBtn.addEventListener("click", undo);
+  shareBtn.addEventListener("click", openShareModal);
+  hashCopy.addEventListener("click", copyHash);
+  hashLoad.addEventListener("click", loadHash);
+  hashClose.addEventListener("click", closeShareModal);
+  shareModal.addEventListener("click", e => {
+    if (e.target === shareModal) closeShareModal();
+  });
+
+  document.addEventListener("keydown", e => {
+    const map = { ArrowLeft: "left", ArrowRight: "right",
+                  ArrowUp: "up", ArrowDown: "down" };
+    if (map[e.key]) { e.preventDefault(); handleMove(map[e.key]); }
+    else if (e.key === "r" || e.key === "R") restart();
+    else if ((e.ctrlKey || e.metaKey) && e.key === "z") undo();
+    else if (e.key === "Escape" && shareModal.classList.contains("show")) {
+      closeShareModal();
+    }
+  });
+
+  document.addEventListener("gesturestart", e => e.preventDefault());
+
+  // ============ СТАРТ ============
+  function init() {
+    computeLayout();
+
+    const saved = loadState();
+    if (saved) {
+      applyLoadedState(saved);
+    } else {
+      let seed = null;
+      try {
+        const stored = localStorage.getItem(SEED_KEY);
+        if (stored) seed = parseInt(stored, 10);
+      } catch {}
+      if (!seed || isNaN(seed)) seed = randomSeed();
+      startGameWithSeed(seed);
+    }
+
+    attachSwipe(boardEl, handleMove);
+
+    let rafId = null;
+    const relayout = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        computeLayout();
+        redrawTiles();
+        rafId = null;
+      });
+    };
+
+    window.addEventListener("resize", relayout);
+    window.addEventListener("orientationchange", () => setTimeout(relayout, 200));
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", relayout);
+      window.visualViewport.addEventListener("scroll", relayout);
+    }
+
+    window.addEventListener("pagehide", saveState);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") saveState();
+    });
+  }
+
+  if (document.readyState === "complete") init();
+  else window.addEventListener("load", init);
+})();
+</script>
+</body>
+</html>
